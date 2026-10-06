@@ -1,0 +1,5 @@
+*.bak
+*.xel
+*.sqlaudit
+.DS_Store
+Thumbs.db
