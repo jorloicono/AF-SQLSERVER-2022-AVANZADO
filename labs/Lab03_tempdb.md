@@ -2,7 +2,7 @@
 
 **Sesión 2 · Duración: 45 minutos · Base de datos: tempdb y LegacyShop**
 
-tempdb es el recurso compartido por excelencia de una instancia: todas las bases de datos, todas las sesiones y buena parte de los operadores internos del motor la usan a la vez. En este laboratorio vais a auditar cómo está configurada en el contenedor, a provocar contención creando tablas temporales desde muchas sesiones concurrentes, a identificar qué páginas están en disputa y a medir el efecto de las dos medidas clásicas: más ficheros de datos y metadatos de tempdb en memoria.
+tempdb es el recurso compartido por excelencia de una instancia: todas las bases de datos, todas las sesiones y buena parte de los operadores internos del motor la usan a la vez. En este laboratorio vais a auditar cómo está configurada en vuestra instancia, a provocar contención creando tablas temporales desde muchas sesiones concurrentes, a identificar qué páginas están en disputa y a medir el efecto de las dos medidas clásicas: más ficheros de datos y metadatos de tempdb en memoria.
 
 ## Paso 1 · Auditar la configuración (10 minutos)
 
@@ -39,15 +39,17 @@ GO
 
 ## Paso 3 · Provocar la contención y medir (10 minutos)
 
-Limpiad las estadísticas de esperas, lanzad 32 sesiones durante 90 segundos desde un terminal y, mientras tanto, observad las esperas en SSMS:
+Limpiad las estadísticas de esperas, lanzad 32 sesiones durante 90 segundos desde una ventana de PowerShell abierta en la carpeta del repositorio y, mientras tanto, observad las esperas en SSMS:
 
 ```sql
 DBCC SQLPERF ('sys.dm_os_wait_stats', CLEAR);
 ```
 
-```bash
-docker exec sql2022 bash /datos/carga/concurrente.sh 32 90 "EXEC dbo.usp_TempdbCarga"
+```powershell
+powershell -ExecutionPolicy Bypass -File .\datos\carga\concurrente.ps1 -Sesiones 32 -Segundos 90 -Sql "EXEC dbo.usp_TempdbCarga"
 ```
+
+Si vuestra instancia tiene nombre (por ejemplo SQL Server Express), añadid `-Servidor ".\SQLEXPRESS"`. Si os conectáis con un login SQL en lugar de con vuestro usuario de Windows, añadid `-Usuario sa -Password "..."`.
 
 ```sql
 -- Qué páginas se disputan ahora mismo (repetid varias veces durante la carga)
@@ -81,11 +83,16 @@ FROM sys.dm_exec_procedure_stats WHERE object_id = OBJECT_ID('LegacyShop.dbo.usp
 
 ## Paso 4 · Ajustar ficheros y metadatos (15 minutos)
 
-Si el contenedor tiene menos ficheros que núcleos (hasta 8), añadid los que falten con el mismo tamaño que los existentes. Ajustad los nombres y el tamaño a lo que visteis en el paso 1:
+Si tempdb tiene menos ficheros que núcleos (hasta 8), añadid los que falten con el mismo tamaño que los existentes, en la misma carpeta que el fichero principal. Este bloque calcula la carpeta por vosotros; ajustad el tamaño a lo que visteis en el paso 1 y repetid la línea `EXEC` cambiando el nombre para cada fichero que falte:
 
 ```sql
-ALTER DATABASE tempdb ADD FILE (NAME = tempdev_c2, FILENAME = '/var/opt/mssql/data/tempdb_c2.ndf', SIZE = 8MB, FILEGROWTH = 64MB);
-ALTER DATABASE tempdb ADD FILE (NAME = tempdev_c3, FILENAME = '/var/opt/mssql/data/tempdb_c3.ndf', SIZE = 8MB, FILEGROWTH = 64MB);
+DECLARE @dir nvarchar(400) = (SELECT TOP (1) LEFT(physical_name, LEN(physical_name) - CHARINDEX('\', REVERSE(physical_name)) + 1)
+                              FROM tempdb.sys.database_files WHERE file_id = 1);
+DECLARE @sql nvarchar(max);
+SET @sql = N'ALTER DATABASE tempdb ADD FILE (NAME = tempdev_c2, FILENAME = ''' + @dir + N'tempdb_c2.ndf'', SIZE = 8MB, FILEGROWTH = 64MB);';
+EXEC (@sql);
+SET @sql = N'ALTER DATABASE tempdb ADD FILE (NAME = tempdev_c3, FILENAME = ''' + @dir + N'tempdb_c3.ndf'', SIZE = 8MB, FILEGROWTH = 64MB);';
+EXEC (@sql);
 -- ... hasta igualar núcleos (máx. 8). Igualad también el crecimiento del fichero original:
 ALTER DATABASE tempdb MODIFY FILE (NAME = tempdev, FILEGROWTH = 64MB);
 ```
@@ -98,9 +105,7 @@ Después activad los metadatos de tempdb en memoria, que requieren reiniciar el 
 ALTER SERVER CONFIGURATION SET MEMORY_OPTIMIZED TEMPDB_METADATA = ON;
 ```
 
-```bash
-docker restart sql2022
-```
+Reiniciad el servicio de SQL Server desde SQL Server Configuration Manager (o, en una ventana de PowerShell como administrador, `Restart-Service MSSQLSERVER -Force`; para una instancia con nombre, `MSSQL$SQLEXPRESS`).
 
 Comprobad `SERVERPROPERTY('IsTempdbMetadataMemoryOptimized')`, repetid la carga y rellenad la tercera fila.
 
@@ -134,4 +139,4 @@ Los ficheros añadidos y los metadatos en memoria pueden quedarse: son la config
 
 ## Para la puesta en común
 
-¿Qué tipo de contención habéis visto en cada fase? ¿Por qué la mejora del paso 4 puede ser pequeña en un contenedor con pocos núcleos? ¿Qué patrones de código de vuestra empresa impiden la caché de temporales?
+¿Qué tipo de contención habéis visto en cada fase? ¿Por qué la mejora del paso 4 puede ser pequeña en un equipo con pocos núcleos? ¿Qué patrones de código de vuestra empresa impiden la caché de temporales?

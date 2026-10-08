@@ -76,7 +76,7 @@ INSERT #h
 SELECT N'Conexiones sin cifrar', 'MEDIA',
        CASE WHEN SUM(CASE WHEN encrypt_option = 'FALSE' THEN 1 ELSE 0 END) = 0 THEN 'OK' ELSE 'REVISAR' END,
        CONCAT(SUM(CASE WHEN encrypt_option = 'FALSE' THEN 1 ELSE 0 END), N' conexiones sin cifrar ahora mismo'),
-       N'Forzar cifrado (mssql-conf network.forceencryption=1 en Linux) con certificado válido'
+       N'Forzar cifrado (Configuration Manager > Protocolos > Force Encryption; en Linux mssql-conf network.forceencryption=1) con certificado válido'
 FROM sys.dm_exec_connections;
 
 -- 10-13. Controles dentro de LegacyShop

@@ -6,9 +6,9 @@ Always Encrypted es la única funcionalidad de SQL Server que protege los datos 
 
 ## Requisitos y organización
 
-El asistente de cifrado y el almacén de certificados de Windows exigen **SSMS en Windows**. Quien trabaje en macOS o Linux hará este laboratorio en pareja con un compañero con Windows, y aportará la "conexión de sysadmin sin clave" del paso 5 desde su propio VS Code o desde `sqlcmd` dentro del contenedor, lo que hace la demostración todavía más convincente.
+El asistente de cifrado y el almacén de certificados de Windows exigen **SSMS en Windows**. Como trabajáis con SQL Server instalado en Windows, tenéis todo lo necesario en vuestro propio equipo.
 
-El contenedor Linux soporta Always Encrypted **sin enclaves**. Las operaciones con enclave (comparaciones de rango, `LIKE` y ordenación sobre datos cifrados con cifrado aleatorio) requieren SQL Server en Windows con VBS; en el paso 4 veréis precisamente el error que lo demuestra. La guía para montar el enclave en una VM está en `setup/README.md`.
+Con la configuración por defecto la instancia **no tiene ningún enclave habilitado**, así que trabajaremos con Always Encrypted sin enclaves. Las operaciones con enclave (comparaciones de rango, `LIKE` y ordenación sobre datos cifrados con cifrado aleatorio) requieren activar el enclave VBS de la instancia; en el paso 4 veréis precisamente el error que lo demuestra. Al final de `setup/README.md` tenéis cómo activarlo si queréis probarlo por vuestra cuenta.
 
 Antes de empezar, comprobad que no hay máscaras en las columnas que vais a cifrar (Dynamic Data Masking no es compatible con columnas cifradas):
 
@@ -87,24 +87,23 @@ Anotad cada error. Con cifrado aleatorio el servidor no puede hacer nada con el 
 
 ## Paso 5 · Un sysadmin sin la CMK (5 minutos)
 
-Desde un sitio que **no** tenga vuestro certificado (el `sqlcmd` del contenedor, VS Code en el portátil de vuestro compañero, o SSMS iniciado con otro usuario de Windows), conectaos como `sa` con el cifrado activado:
+En vuestro equipo el certificado de la CMK está en vuestro almacén de Windows, así que para simular a un administrador que no lo tiene lo vamos a retirar temporalmente. Abrid `certmgr.msc` → Personal → Certificados, localizad "Always Encrypted Auto Certificate...", **exportadlo primero** (clic derecho → Todas las tareas → Exportar → *Sí, exportar la clave privada* → guardad el `.pfx` con una contraseña) y después eliminadlo del almacén.
 
-```bash
-docker exec -it sql2022 /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'Curso_SQL2022!' -d LegacyShop
-```
+Ahora, en la conexión con `Column Encryption Setting=Enabled`, conectado como `sa` o como vuestro usuario sysadmin:
 
 ```sql
 SELECT TOP (3) ClienteID, IBAN FROM dbo.Clientes;
-GO
 ```
 
-`sa` ve el binario cifrado. Si se conecta con `Column Encryption Setting=Enabled` desde un cliente sin el certificado, obtiene un error del estilo "Failed to decrypt a column encryption key... certificate not found". Ser sysadmin no da acceso a los datos: da acceso a los metadatos y a los valores cifrados. Tampoco sirve un backup: la base restaurada en otro servidor sigue sin la CMK.
+El controlador devuelve un error del estilo "Failed to decrypt a column encryption key... certificate not found", y en la conexión sin cifrado solo se ve el binario. Ser sysadmin no da acceso a los datos: da acceso a los metadatos y a los valores cifrados. Tampoco sirve un backup: la base restaurada en otro servidor sigue sin la CMK.
+
+Volved a importar el certificado (doble clic en el `.pfx` → Usuario actual → almacén Personal) y comprobad que la conexión con cifrado vuelve a ver los datos en claro. **Sin este paso no podréis descifrar las columnas en la limpieza.**
 
 ## Limpieza (obligatoria antes del Lab 10)
 
 Descifrad las columnas con el mismo asistente: **Encrypt Columns...** → para `IBAN` y `FechaNacimiento` elegid **Plaintext** → **Proceed to finish now**. Comprobad con la consulta del paso 1 que ya no hay columnas cifradas. Si el asistente falla o no tenéis tiempo, relanzad `datos/01_crear_LegacyShop.sql` (unos 5 minutos).
 
-Opcionalmente, eliminad el certificado de vuestro almacén (`certmgr.msc` → Personal → Certificados → "Always Encrypted Auto Certificate...") y las claves del servidor (`DROP COLUMN ENCRYPTION KEY ...; DROP COLUMN MASTER KEY ...;`).
+Opcionalmente, una vez descifradas las columnas, eliminad el certificado de vuestro almacén y las claves del servidor (`DROP COLUMN ENCRYPTION KEY ...; DROP COLUMN MASTER KEY ...;`).
 
 ## Para la puesta en común
 

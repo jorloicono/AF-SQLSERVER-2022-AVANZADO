@@ -62,7 +62,7 @@ USE LedgerLab;
 CREATE TABLE dbo.Precios (ProductoID int PRIMARY KEY, Precio decimal(10,2) NOT NULL)
 WITH (SYSTEM_VERSIONING = ON, LEDGER = ON);
 INSERT dbo.Precios VALUES (1, 10.00), (2, 20.00), (3, 30.00);
-BACKUP DATABASE LedgerLab TO DISK = '/var/opt/mssql/backup/LedgerLab_antes.bak' WITH INIT;
+BACKUP DATABASE LedgerLab TO DISK = 'LedgerLab_antes.bak' WITH INIT;   -- carpeta de backups por defecto
 
 UPDATE dbo.Precios SET Precio = 12.00 WHERE ProductoID = 1;     -- cambio legítimo
 EXEC sys.sp_generate_database_ledger_digest;                     -- COPIAD el JSON devuelto fuera de SQL Server
@@ -72,7 +72,7 @@ Guardad el JSON en un fichero de texto de vuestro portátil: en la vida real ir�
 
 ```sql
 USE master;
-RESTORE DATABASE LedgerLab FROM DISK = '/var/opt/mssql/backup/LedgerLab_antes.bak' WITH REPLACE;
+RESTORE DATABASE LedgerLab FROM DISK = 'LedgerLab_antes.bak' WITH REPLACE;
 GO
 USE LedgerLab;
 UPDATE dbo.Precios SET Precio = 1.00 WHERE ProductoID = 1;       -- historia falsificada

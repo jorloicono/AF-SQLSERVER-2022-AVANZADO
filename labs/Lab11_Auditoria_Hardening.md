@@ -4,19 +4,20 @@
 
 En este laboratorio vais a montar una auditoría de SQL Server orientada a lo que de verdad importa en LegacyShop (quién accede a los datos de clientes, quién cambia permisos y quién intenta entrar sin éxito), a reconstruir una actividad sospechosa a partir del fichero de auditoría, a comprobar que ni siquiera un administrador puede apagar la auditoría sin dejar rastro, y a ejecutar un chequeo de hardening de la instancia. Terminaréis guardando los eventos de seguridad relevantes en una tabla de ledger de solo inserción.
 
-Comprobad antes que existe la carpeta de auditoría con los permisos correctos (paso 1 de `setup/README.md`):
-
-```bash
-docker exec sql2022 ls -ld /var/opt/mssql/audit
-```
+Los ficheros de auditoría se guardarán en la carpeta de backups por defecto de vuestra instancia, porque la cuenta de servicio de SQL Server ya tiene permiso de escritura en ella y así no tenéis que crear carpetas ni tocar permisos de Windows. En producción iría en un disco dedicado y con acceso restringido.
 
 ## Paso 1 · Crear la auditoría (10 minutos)
 
 ```sql
 USE master;
+DECLARE @dir nvarchar(400) = CAST(SERVERPROPERTY('InstanceDefaultBackupPath') AS nvarchar(400));
+IF RIGHT(@dir, 1) <> N'\' SET @dir += N'\';
+DECLARE @sql nvarchar(max) = N'
 CREATE SERVER AUDIT Audit_LegacyShop
-  TO FILE (FILEPATH = '/var/opt/mssql/audit/', MAXSIZE = 256 MB, MAX_ROLLOVER_FILES = 20)
-  WITH (QUEUE_DELAY = 1000, ON_FAILURE = CONTINUE);
+  TO FILE (FILEPATH = ''' + @dir + N''', MAXSIZE = 256 MB, MAX_ROLLOVER_FILES = 20)
+  WITH (QUEUE_DELAY = 1000, ON_FAILURE = CONTINUE);';
+EXEC (@sql);
+SELECT name, log_file_path FROM sys.server_file_audits;   -- dónde quedan los ficheros
 ALTER SERVER AUDIT Audit_LegacyShop WITH (STATE = ON);
 
 CREATE SERVER AUDIT SPECIFICATION Spec_Servidor FOR SERVER AUDIT Audit_LegacyShop
@@ -40,12 +41,17 @@ WITH (STATE = ON);
 
 Simulad la secuencia de un atacante que ha conseguido las credenciales de un empleado:
 
-```sql
--- 1. Intentos de login fallidos (ejecutadlo desde un terminal)
+Primero, tres intentos de acceso fallidos. Lo más sencillo es hacerlo desde SSMS: Archivo → Conectar Explorador de objetos, autenticación SQL Server, login `atencion99`, contraseña `mala`, y repetirlo tres veces. Si preferís PowerShell (cambiad `localhost` por `.\SQLEXPRESS` si vuestra instancia tiene nombre):
+
+```powershell
+1..3 | ForEach-Object {
+  $cn = New-Object System.Data.SqlClient.SqlConnection "Server=localhost;User ID=atencion99;Password=mala;TrustServerCertificate=True"
+  try { $cn.Open() } catch { Write-Host "Intento $_ fallido (esperado)" } finally { $cn.Dispose() }
+}
 ```
-```bash
-for i in 1 2 3; do docker exec sql2022 /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U atencion99 -P 'mala' -Q "SELECT 1" ; done
-```
+
+Después, el resto de la secuencia en SSMS:
+
 ```sql
 -- 2. Un usuario de atención al cliente consulta datos masivamente
 USE LegacyShop;
@@ -63,9 +69,10 @@ ALTER ROLE db_datareader ADD MEMBER atencion03;
 Esperad un par de segundos (el `QUEUE_DELAY`) y reconstruid la cronología:
 
 ```sql
+DECLARE @ficheros nvarchar(400) = (SELECT log_file_path + N'*.sqlaudit' FROM sys.server_file_audits WHERE name = N'Audit_LegacyShop');
 SELECT event_time, action_id, succeeded, server_principal_name, database_principal_name,
        object_name, LEFT(statement, 150) AS sentencia, client_ip
-FROM sys.fn_get_audit_file('/var/opt/mssql/audit/*.sqlaudit', DEFAULT, DEFAULT)
+FROM sys.fn_get_audit_file(@ficheros, DEFAULT, DEFAULT)
 WHERE event_time > DATEADD(MINUTE, -15, SYSUTCDATETIME())
 ORDER BY event_time;
 ```
@@ -86,8 +93,9 @@ ALTER SERVER AUDIT Audit_LegacyShop WITH (STATE = OFF);
 -- ... el "atacante" haría aquí sus consultas ...
 ALTER SERVER AUDIT Audit_LegacyShop WITH (STATE = ON);
 
+DECLARE @ficheros nvarchar(400) = (SELECT log_file_path + N'*.sqlaudit' FROM sys.server_file_audits WHERE name = N'Audit_LegacyShop');
 SELECT event_time, action_id, server_principal_name, statement
-FROM sys.fn_get_audit_file('/var/opt/mssql/audit/*.sqlaudit', DEFAULT, DEFAULT)
+FROM sys.fn_get_audit_file(@ficheros, DEFAULT, DEFAULT)
 WHERE action_id IN ('AUSC', 'AL', 'CR', 'DR') ORDER BY event_time DESC;
 ```
 
@@ -116,7 +124,7 @@ Volved a ejecutar el chequeo y comparad el número de filas `REVISAR`.
 |---|---|---|---|
 | | | | |
 
-En el contenedor habrá controles que no podéis resolver sin romper el laboratorio, como la cuenta `sa` habilitada. Documentadlos como riesgo aceptado del entorno de formación.
+En vuestra instancia de prácticas habrá controles que quizá no queráis resolver, como la cuenta `sa` habilitada o las conexiones sin cifrar. Documentadlos como riesgo aceptado del entorno de formación.
 
 ## Paso 5 · Eventos de seguridad en una tabla ledger de solo inserción (5 minutos)
 
@@ -128,9 +136,10 @@ CREATE TABLE dbo.EventosSeguridad (
     Evento  nvarchar(400) NOT NULL
 ) WITH (LEDGER = ON (APPEND_ONLY = ON));
 
+DECLARE @ficheros nvarchar(400) = (SELECT log_file_path + N'*.sqlaudit' FROM sys.server_file_audits WHERE name = N'Audit_LegacyShop');
 INSERT dbo.EventosSeguridad (Evento)
 SELECT CONCAT(action_id, N' · ', server_principal_name, N' · ', LEFT(statement, 300))
-FROM sys.fn_get_audit_file('/var/opt/mssql/audit/*.sqlaudit', DEFAULT, DEFAULT)
+FROM sys.fn_get_audit_file(@ficheros, DEFAULT, DEFAULT)
 WHERE action_id IN ('LGIF', 'AUSC', 'G', 'APRL', 'SL')
   AND event_time > DATEADD(HOUR, -1, SYSUTCDATETIME());
 

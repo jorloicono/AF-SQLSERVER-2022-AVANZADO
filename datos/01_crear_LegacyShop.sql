@@ -10,9 +10,9 @@
             LogActividad ≈ 200.000 (montículo)
    Duración aproximada: 3-6 minutos en un portátil con 4 núcleos / 8 GB.
 
-   Ejecutar como sa:
-   docker exec -it sql2022 /opt/mssql-tools18/bin/sqlcmd -C -S localhost \
-        -U sa -P 'Curso_SQL2022!' -i /datos/01_crear_LegacyShop.sql
+   Ejecutar en SSMS (Archivo > Abrir > este fichero, F5) conectado a vuestra
+   instancia local con un login sysadmin. Los ficheros se crean en las rutas
+   por defecto de la instancia.
 
    AVISO: los defectos de rendimiento y seguridad son DELIBERADOS.
    No uséis este código como modelo en producción.
@@ -27,12 +27,17 @@ BEGIN
     DROP DATABASE LegacyShop;
 END
 GO
+-- Rutas por defecto de la instancia (válido en Windows y en Linux)
+DECLARE @dat nvarchar(512) = CAST(SERVERPROPERTY('InstanceDefaultDataPath') AS nvarchar(512)),
+        @log nvarchar(512) = CAST(SERVERPROPERTY('InstanceDefaultLogPath')  AS nvarchar(512));
+DECLARE @sql nvarchar(max) = N'
 CREATE DATABASE LegacyShop
-    ON PRIMARY (NAME = LegacyShop_data, FILENAME = '/var/opt/mssql/data/LegacyShop.mdf',
+    ON PRIMARY (NAME = LegacyShop_data, FILENAME = ''' + @dat + N'LegacyShop.mdf'',
                 SIZE = 1536MB, FILEGROWTH = 512MB)
-    LOG ON     (NAME = LegacyShop_log,  FILENAME = '/var/opt/mssql/data/LegacyShop_log.ldf',
+    LOG ON     (NAME = LegacyShop_log,  FILENAME = ''' + @log + N'LegacyShop_log.ldf'',
                 SIZE = 1024MB, FILEGROWTH = 256MB)
-    COLLATE SQL_Latin1_General_CP1_CI_AS;   -- intercalación SQL: clave para el lab de conversiones implícitas
+    COLLATE SQL_Latin1_General_CP1_CI_AS;';   -- intercalación SQL: clave para el lab de conversiones implícitas
+EXEC (@sql);
 GO
 ALTER DATABASE LegacyShop SET RECOVERY SIMPLE;
 ALTER DATABASE LegacyShop SET COMPATIBILITY_LEVEL = 160;

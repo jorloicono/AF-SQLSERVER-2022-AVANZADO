@@ -92,10 +92,10 @@ GROUP BY pr.Categoria
 OPTION (RECOMPILE);   -- quitad RECOMPILE: el feedback necesita reutilizar el plan
 ```
 
-Quitad el `OPTION (RECOMPILE)` y lanzad la consulta muchas veces seguidas. Desde otra ventana o desde el contenedor podéis usar el lanzador concurrente con una sola sesión:
+Quitad el `OPTION (RECOMPILE)` y lanzad la consulta muchas veces seguidas. Desde una ventana de PowerShell, en la carpeta del repositorio, podéis usar el lanzador concurrente con una sola sesión:
 
-```bash
-docker exec sql2022 bash /datos/carga/concurrente.sh 1 180 "SELECT pr.Categoria, SUM(l.Cantidad * l.PrecioUnitario) AS Importe FROM dbo.LineasPedido l JOIN dbo.Productos pr ON pr.ProductoID = l.ProductoID GROUP BY pr.Categoria;"
+```powershell
+powershell -ExecutionPolicy Bypass -File .\datos\carga\concurrente.ps1 -Sesiones 1 -Segundos 180 -Sql "SELECT pr.Categoria, SUM(l.Cantidad * l.PrecioUnitario) AS Importe FROM dbo.LineasPedido l JOIN dbo.Productos pr ON pr.ProductoID = l.ProductoID GROUP BY pr.Categoria;"
 ```
 
 Mientras corre, consultad el estado del feedback:
@@ -106,7 +106,7 @@ FROM sys.query_store_plan_feedback pf
 WHERE pf.feature_desc = N'DOP Feedback';
 ```
 
-Los estados que podéis ver son `PENDING_VALIDATION`, `VERIFICATION_PASSED`, `VERIFICATION_REGRESSED` y `NO_RECOMMENDATION`, entre otros. En un contenedor con pocos núcleos es posible que el feedback no encuentre mejora y termine en `NO_RECOMMENDATION`: también es un resultado válido y sirve para explicar que el mecanismo solo reduce el DOP cuando la consulta no pierde rendimiento. Anotad lo que veáis y cuántos núcleos tiene vuestro contenedor (`SELECT cpu_count FROM sys.dm_os_sys_info;`).
+Los estados que podéis ver son `PENDING_VALIDATION`, `VERIFICATION_PASSED`, `VERIFICATION_REGRESSED` y `NO_RECOMMENDATION`, entre otros. En un equipo con pocos núcleos es posible que el feedback no encuentre mejora y termine en `NO_RECOMMENDATION`: también es un resultado válido y sirve para explicar que el mecanismo solo reduce el DOP cuando la consulta no pierde rendimiento. Anotad lo que veáis y cuántos núcleos ve vuestra instancia (`SELECT cpu_count FROM sys.dm_os_sys_info;`).
 
 ## Paso 5 · Aplicar y retirar una Query Store hint (10 minutos)
 

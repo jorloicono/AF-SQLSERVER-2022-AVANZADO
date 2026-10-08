@@ -20,24 +20,17 @@ Todo el curso gira en torno a LegacyShop, una tienda online ficticia con quince 
 ```
 slides/   Presentaciones de cada sesión en PDF
 labs/     Laboratorios guiados (Lab01 … Lab12)
-datos/    Script de creación de LegacyShop y scripts de carga concurrente
+datos/    Script de creación de LegacyShop y scripts de carga concurrente en PowerShell
 scripts/  Consultas de diagnóstico reutilizables (esperas, I/O, Query Store, bloqueos, deadlocks, hardening)
-setup/    docker-compose.yml y guía de preparación del entorno
+setup/    Guía de preparación del entorno
 ```
 
 ## Antes de la primera sesión
 
-Seguid `setup/README.md` para levantar SQL Server 2022 en Docker y crear LegacyShop. Llegad a la primera sesión con el contenedor funcionando: la creación de la base tarda unos minutos y conviene no perder tiempo de clase en ello.
+Necesitáis SQL Server 2022 (recomendada la edición Developer, gratuita) instalado en Windows y SSMS 21 o posterior. Seguid `setup/README.md` para comprobar la instancia y crear LegacyShop: basta con abrir `datos/01_crear_LegacyShop.sql` en SSMS y pulsar F5. Llegad a la primera sesión con la base creada, porque tarda unos minutos y conviene no perder tiempo de clase en ello.
 
-```bash
-cd setup
-docker compose up -d
-docker exec -u root sql2022 bash -c "mkdir -p /var/opt/mssql/audit /var/opt/mssql/backup && chown -R mssql /var/opt/mssql/audit /var/opt/mssql/backup"
-docker exec -it sql2022 /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'Curso_SQL2022!' -i /datos/01_crear_LegacyShop.sql
-```
-
-Como cliente se recomienda SSMS 21 o posterior en Windows. En macOS o Linux sirve Visual Studio Code con la extensión MSSQL; en ese caso, el Lab 9 (Always Encrypted) se hace en pareja con alguien que tenga SSMS en Windows.
+Los laboratorios que necesitan muchas sesiones concurrentes usan los scripts de PowerShell de `datos/carga/`, que funcionan en cualquier Windows sin instalar nada más.
 
 ## Aviso
 
-LegacyShop contiene defectos de rendimiento y de seguridad deliberados, y la contraseña de `sa` del entorno es pública. Usad este material solo en vuestro entorno local de prácticas.
+LegacyShop contiene defectos de rendimiento y de seguridad deliberados, y algunos laboratorios crean logins con contraseñas débiles y amplían la superficie de ataque de la instancia. Usad este material solo en vuestra instancia local de prácticas, nunca en un servidor compartido o de producción.

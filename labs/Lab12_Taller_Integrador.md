@@ -23,19 +23,21 @@ Puede haber problemas que no aparezcan en ningún ticket. Si los encontráis, cu
 
 ## Reglas
 
-Nada se cambia sin evidencia previa (una espera, un operador de un plan, una métrica de Query Store). Todo cambio tiene script de marcha atrás y queda en el registro. Se mide antes y después con la misma carga. Está prohibido "arreglar" con `DBCC FREEPROCCACHE`, reinicios o `NOLOCK` generalizado. Se puede cambiar código, índices y configuración de base de datos, pero no el hardware del contenedor. Si un cambio empeora algo, se deshace y se documenta: también es un resultado.
+Nada se cambia sin evidencia previa (una espera, un operador de un plan, una métrica de Query Store). Todo cambio tiene script de marcha atrás y queda en el registro. Se mide antes y después con la misma carga. Está prohibido "arreglar" con `DBCC FREEPROCCACHE`, reinicios o `NOLOCK` generalizado. Se puede cambiar código, índices y configuración de base de datos, pero no el hardware de la máquina. Si un cambio empeora algo, se deshace y se documenta: también es un resultado.
 
 ## Preparación del entorno (todos a la vez, 10 minutos)
 
-```bash
-cd setup
-docker compose up -d
-docker exec -it sql2022 /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'Curso_SQL2022!' -i /datos/01_crear_LegacyShop.sql
-docker exec -it sql2022 /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'Curso_SQL2022!' -i /datos/99_romper_LegacyShop.sql
-docker exec -d sql2022 bash /datos/carga/carga.sh 8 1800
+El instructor os entregará el script `99_romper_LegacyShop.sql` al empezar la sesión. Copiadlo en la carpeta `datos/` del repositorio y no lo abráis para leerlo hasta el debrief.
+
+1. En SSMS, abrid y ejecutad (F5) `datos/01_crear_LegacyShop.sql`, que recrea la base desde cero (unos 5 minutos).
+2. En SSMS, abrid y ejecutad `datos/99_romper_LegacyShop.sql`, que deja LegacyShop en el "estado incidente".
+3. Abrid una ventana de PowerShell en la carpeta del repositorio y arrancad la carga (dejad esa ventana abierta):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\datos\carga\carga.ps1 -Sesiones 8 -Segundos 1800
 ```
 
-El instructor os entregará el script `99_romper_LegacyShop.sql` al empezar la sesión: copiadlo en la carpeta `datos/` del repositorio antes de ejecutar el segundo comando, y no lo abráis hasta el debrief. Comprobad que la carga está viva:
+Si vuestra instancia tiene nombre, añadid `-Servidor ".\SQLEXPRESS"`; si os conectáis con login SQL, `-Usuario sa -Password "..."`. Comprobad que la carga está viva:
 
 ```sql
 SELECT r.session_id, r.status, r.command, r.wait_type, r.blocking_session_id, s.host_name
@@ -48,9 +50,9 @@ FROM LegacyShop.dbo.CargaErrores GROUP BY Operacion, Numero ORDER BY errores DES
 
 Para parar la carga (por ejemplo antes de crear un índice grande) y relanzarla para medir:
 
-```bash
-docker exec sql2022 bash /datos/carga/parar.sh
-docker exec -d sql2022 bash /datos/carga/carga.sh 8 600
+```powershell
+powershell -ExecutionPolicy Bypass -File .\datos\carga\parar.ps1                                   # desde otra ventana de PowerShell
+powershell -ExecutionPolicy Bypass -File .\datos\carga\carga.ps1 -Sesiones 8 -Segundos 600         # cuando la anterior haya terminado
 ```
 
 ## Fase 1 · Diagnóstico (45 minutos)
@@ -152,6 +154,6 @@ REVERT;
 
 Detened la carga, guardad vuestras tablas y registro de cambios, y **no** borréis nada hasta después del debrief: compararemos vuestras soluciones en común.
 
-```bash
-docker exec sql2022 bash /datos/carga/parar.sh
+```powershell
+powershell -ExecutionPolicy Bypass -File .\datos\carga\parar.ps1
 ```

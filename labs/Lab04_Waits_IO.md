@@ -29,7 +29,7 @@ ORDER BY espera_ms DESC;
 
 ## Paso 1 · Latencia por fichero (5 minutos)
 
-Lanzad `scripts/io_delta.sql` con `@espera = '00:00:30'` mientras en otra ventana ejecutáis `EXEC dbo.usp_InformeVentasCategoria @Anio = 2024;` dos veces. Apuntad la latencia media de lectura del fichero de datos de LegacyShop y la de escritura del log. En un portátil con SSD y Docker veréis valores bajos; lo importante es aprender a leerlos y a compararlos con las referencias orientativas: por debajo de 10-20 ms por lectura en datos y de 1-5 ms por escritura en log.
+Lanzad `scripts/io_delta.sql` con `@espera = '00:00:30'` mientras en otra ventana ejecutáis `EXEC dbo.usp_InformeVentasCategoria @Anio = 2024;` dos veces. Apuntad la latencia media de lectura del fichero de datos de LegacyShop y la de escritura del log. En un portátil con SSD veréis valores bajos; lo importante es aprender a leerlos y a compararlos con las referencias orientativas: por debajo de 10-20 ms por lectura en datos y de 1-5 ms por escritura en log.
 
 ## Paso 2 · PAGEIOLATCH: leer lo que no hace falta (15 minutos)
 
@@ -124,7 +124,7 @@ Un backup completo genera esperas `ASYNC_IO_COMPLETION` en la sesión que lo lan
 
 ```sql
 -- Foto inicial y después:
-BACKUP DATABASE LegacyShop TO DISK = '/var/opt/mssql/backup/LegacyShop_lab4.bak'
+BACKUP DATABASE LegacyShop TO DISK = 'LegacyShop_lab4.bak'   -- sin ruta: va a la carpeta de backups por defecto
 WITH INIT, COMPRESSION, STATS = 20;
 ```
 
