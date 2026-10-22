@@ -27,7 +27,7 @@ Nada se cambia sin evidencia previa (una espera, un operador de un plan, una mé
 
 ## Preparación del entorno (todos a la vez, 10 minutos)
 
-El instructor os entregará el script `99_romper_LegacyShop.sql` al empezar la sesión. Copiadlo en la carpeta `datos/` del repositorio y no lo abráis para leerlo hasta el debrief.
+El script `99_romper_LegacyShop.sql` está en la carpeta `datos/`. Ejecutadlo, pero no lo abráis para leerlo hasta el debrief: contiene las pistas de lo que vais a tener que encontrar.
 
 1. En SSMS, abrid y ejecutad (F5) `datos/01_crear_LegacyShop.sql`, que recrea la base desde cero (unos 5 minutos).
 2. En SSMS, abrid y ejecutad `datos/99_romper_LegacyShop.sql`, que deja LegacyShop en el "estado incidente".

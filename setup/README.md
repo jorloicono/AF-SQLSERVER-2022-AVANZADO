@@ -51,7 +51,7 @@ La ventana que lanza la carga queda ocupada hasta que termina. Las sesiones se i
 
 ## Sesión 6 · Taller integrador
 
-Antes del taller, el instructor os entregará `99_romper_LegacyShop.sql`. Copiadlo en `datos/` y seguid el apartado "Preparación del entorno" de `labs/Lab12_Taller_Integrador.md`: recrear la base con el script 01, ejecutar el 99 y arrancar `carga.ps1`.
+Antes del taller, seguid el apartado "Preparación del entorno" de `labs/Lab12_Taller_Integrador.md`: recrear la base con el script 01, ejecutar el 99 y arrancar `carga.ps1`.
 
 ## Opcional · Enclave VBS para Always Encrypted
 
